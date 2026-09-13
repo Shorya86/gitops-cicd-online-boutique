@@ -39,6 +39,7 @@ jobs:
           severity: "CRITICAL"
           exit-code: "1"
           format: "table"
+          trivyignores: "${{ env.SERVICE_DIR }}/.trivyignore"
 
       # --- Smoke test: does the built image actually boot? ---
       - name: Smoke test - container starts and stays up

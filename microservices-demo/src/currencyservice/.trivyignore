@@ -1,0 +1,15 @@
+# CVE-2026-59873: DoS (gzip bomb) in `tar`, pulled in transitively via
+# pprof -> @mapbox/node-pre-gyp -> tar. tar is only invoked at `npm install`
+# time to extract a prebuilt native profiling binary — it is never executed
+# by the running currencyservice process, so this is not exposed on the
+# request path.
+#
+# Attempted fix: forced tar to >=7.5.19 via package.json "overrides".
+# Result: broke `npm install --only=production` — node-pre-gyp@1.0.10
+# (last release, no update available) is incompatible with tar v7's
+# breaking API changes. A real fix would require node-pre-gyp itself to
+# release a tar-v7-compatible version, which is out of our control.
+#
+# Risk accepted 2026-09-08. Revisit if @google-cloud/profiler/pprof bumps
+# its node-pre-gyp dependency.
+CVE-2026-59873

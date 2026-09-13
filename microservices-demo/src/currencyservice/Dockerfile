@@ -30,9 +30,11 @@ COPY package*.json ./
 
 RUN npm install --only=production
 
-FROM alpine:3.24.1@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
-
-RUN apk add --no-cache nodejs
+FROM node:20.20.2-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293
+# ^ pinned to the exact same digest as the builder stage above, so the Node.js ABI
+# (and therefore pprof's native binary) matches. The previous "alpine + apk add nodejs"
+# approach installed whatever Node version Alpine's package repo currently has, which
+# drifts forward over time and breaks the native binary copied from the builder stage.
 
 WORKDIR /usr/src/app
 
@@ -41,5 +43,11 @@ COPY --from=builder /usr/src/app/node_modules ./node_modules
 COPY . .
 
 EXPOSE 7000
+
+# @google-cloud/profiler only works when running on GCP (auto-detects its Project ID
+# via the GKE/GCE metadata service). Our target platforms are kind and Azure AKS, not
+# GCP, so the metadata service never exists and the profiler crashes on startup unless
+# explicitly disabled.
+ENV DISABLE_PROFILER=1
 
 ENTRYPOINT [ "node", "server.js" ]
