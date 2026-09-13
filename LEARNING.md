@@ -76,3 +76,27 @@ Notes after each week's milestone — what I built, what confused me, what I'd e
 - Kubernetes resource `requests` are guaranteed, but `limits` can be — and routinely are — oversold across a node (I saw a node reporting 502% of its CPU capacity in allocated *limits*, which is normal, not a bug)
 - The managed control plane (API server, etcd, scheduler) is free on AKS; only the node pool VMs are billed, which is why "spin up, verify, tear down fast" is the actual cost-control strategy, not a nice-to-have
 
+---
+
+## Week 4 — GitHub Actions CI pipeline
+
+**Draft — rewrite this in your own words before treating it as done.**
+
+### What I built
+- A GitHub Actions pipeline for `currencyservice`: lint (Dockerfile via hadolint) → build → Trivy vulnerability scan → smoke test (container actually boots and stays up) → push to Docker Hub → Slack pass/fail notification
+- Wired up a Slack incoming webhook and Docker Hub access token as GitHub repo secrets, so no credentials ever touch the workflow file or chat
+- Found and fixed three real, unrelated bugs the pipeline surfaced before ever reaching production:
+  1. A CRITICAL CVE (`protobufjs`, arbitrary code execution) pulled in transitively via an old, deprecated OpenTelemetry exporter — fixed with an `npm overrides` pin, verified with a real rebuild + boot test
+  2. A separate CVE (`tar`, DoS) where the "real" fix broke the build entirely (incompatible with `node-pre-gyp`) — documented and formally accepted via `.trivyignore` instead, since the vulnerable code only runs at `npm install` time, never in the live service
+  3. A completely unrelated Docker reproducibility bug: the final build stage installed Node.js unpinned (`apk add nodejs`), which had silently drifted to a newer major version than the pinned builder stage, breaking a native binary's ABI compatibility — invisible locally because Docker's build cache was hiding it, but would have broken on every single real CI run (CI always builds fresh, no cache)
+
+### What confused me
+- `npm audit` and Trivy scanning the actual built image can report *different* things, since they analyze different scopes — audit sees the full lockfile, Trivy sees what's actually installed in the final image layers
+- Not every CVE fix is safe to apply blindly — forcing a transitive dependency to a newer major version can break things lower in the chain (`tar` v7's breaking changes vs. an old `node-pre-gyp` that never got updated for it). I had to actually test a fix, not just apply it and assume it worked.
+- A bug can be real and 100% reproducible in CI while being completely invisible in local development, purely because of build caching — this is exactly why CI needs to build fresh, not trust a developer's cached image
+
+### How I'd explain it in an interview
+- A vulnerability's severity on paper (CRITICAL) and its actual exploitability in context (a build-time-only tool vs. code in the live request path) are two different questions — a good CVE triage separates them instead of treating every CRITICAL identically
+- Multi-stage Docker builds need *every* stage's base image pinned consistently, not just the builder — pinning one stage and leaving another to float is a reproducibility bug waiting to happen
+- CI's value isn't just "did it build" — the smoke test step (actually running the container, not just building it) is what caught two of the three bugs; a pipeline that only builds and pushes would have shipped a broken image straight to a registry
+
