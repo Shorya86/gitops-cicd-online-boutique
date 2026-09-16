@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: productcatalogservice
+  labels:
+    app: productcatalogservice
+spec:
+  replicas: {{ .Values.productcatalogservice.replicaCount }}
+  selector:
+    matchLabels:
+      app: productcatalogservice
+  template:
+    metadata:
+      labels:
+        app: productcatalogservice
+    spec:
+      serviceAccountName: productcatalogservice
+      terminationGracePeriodSeconds: 5
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+      - name: server
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          privileged: false
+          readOnlyRootFilesystem: true
+        image: "{{ .Values.productcatalogservice.image.repository }}:{{ .Values.productcatalogservice.image.tag }}"
+        ports:
+        - containerPort: {{ .Values.productcatalogservice.port }}
+        env:
+        - name: PORT
+          value: "{{ .Values.productcatalogservice.port }}"
+        - name: DISABLE_PROFILER
+          value: "1"
+        readinessProbe:
+          grpc:
+            port: {{ .Values.productcatalogservice.port }}
+        livenessProbe:
+          grpc:
+            port: {{ .Values.productcatalogservice.port }}
+        resources:
+          requests:
+            cpu: {{ .Values.productcatalogservice.resources.requests.cpu }}
+            memory: {{ .Values.productcatalogservice.resources.requests.memory }}
+          limits:
+            cpu: {{ .Values.productcatalogservice.resources.limits.cpu }}
+            memory: {{ .Values.productcatalogservice.resources.limits.memory }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: productcatalogservice
+  labels:
+    app: productcatalogservice
+spec:
+  type: ClusterIP
+  selector:
+    app: productcatalogservice
+  ports:
+  - name: grpc
+    port: {{ .Values.productcatalogservice.port }}
+    targetPort: {{ .Values.productcatalogservice.port }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: productcatalogservice

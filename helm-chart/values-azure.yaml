@@ -1,0 +1,40 @@
+# Override layer for Azure AKS deployments. Used as: helm install ... -f values.yaml -f values-azure.yaml
+# Only lists values that differ from the local (values.yaml) defaults — AKS nodes
+# aren't fighting a laptop's other processes for resources, so we give the
+# request-heavy services a bit more headroom.
+
+frontend:
+  resources:
+    requests:
+      cpu: 150m
+      memory: 96Mi
+    limits:
+      cpu: 300m
+      memory: 192Mi
+
+cartservice:
+  resources:
+    requests:
+      cpu: 250m
+      memory: 96Mi
+    limits:
+      cpu: 400m
+      memory: 192Mi
+
+checkoutservice:
+  resources:
+    requests:
+      cpu: 150m
+      memory: 96Mi
+    limits:
+      cpu: 300m
+      memory: 192Mi
+
+productcatalogservice:
+  resources:
+    requests:
+      cpu: 150m
+      memory: 96Mi
+    limits:
+      cpu: 300m
+      memory: 192Mi

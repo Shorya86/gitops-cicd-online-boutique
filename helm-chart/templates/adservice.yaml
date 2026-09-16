@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: adservice
+  labels:
+    app: adservice
+spec:
+  replicas: {{ .Values.adservice.replicaCount }}
+  selector:
+    matchLabels:
+      app: adservice
+  template:
+    metadata:
+      labels:
+        app: adservice
+    spec:
+      serviceAccountName: adservice
+      terminationGracePeriodSeconds: 5
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+      - name: server
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          privileged: false
+          readOnlyRootFilesystem: true
+        image: "{{ .Values.adservice.image.repository }}:{{ .Values.adservice.image.tag }}"
+        ports:
+        - containerPort: {{ .Values.adservice.port }}
+        env:
+        - name: PORT
+          value: "{{ .Values.adservice.port }}"
+        resources:
+          requests:
+            cpu: {{ .Values.adservice.resources.requests.cpu }}
+            memory: {{ .Values.adservice.resources.requests.memory }}
+          limits:
+            cpu: {{ .Values.adservice.resources.limits.cpu }}
+            memory: {{ .Values.adservice.resources.limits.memory }}
+        readinessProbe:
+          initialDelaySeconds: 20
+          periodSeconds: 15
+          grpc:
+            port: {{ .Values.adservice.port }}
+        livenessProbe:
+          initialDelaySeconds: 20
+          periodSeconds: 15
+          grpc:
+            port: {{ .Values.adservice.port }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: adservice
+  labels:
+    app: adservice
+spec:
+  type: ClusterIP
+  selector:
+    app: adservice
+  ports:
+  - name: grpc
+    port: {{ .Values.adservice.port }}
+    targetPort: {{ .Values.adservice.port }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: adservice

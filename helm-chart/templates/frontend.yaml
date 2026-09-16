@@ -1,0 +1,113 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  labels:
+    app: frontend
+spec:
+  replicas: {{ .Values.frontend.replicaCount }}
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      serviceAccountName: frontend
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: server
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            privileged: false
+            readOnlyRootFilesystem: true
+          image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
+          ports:
+          - containerPort: {{ .Values.frontend.port }}
+          readinessProbe:
+            initialDelaySeconds: 10
+            httpGet:
+              path: "/_healthz"
+              port: {{ .Values.frontend.port }}
+              httpHeaders:
+              - name: "Cookie"
+                value: "shop_session-id=x-readiness-probe"
+          livenessProbe:
+            initialDelaySeconds: 10
+            httpGet:
+              path: "/_healthz"
+              port: {{ .Values.frontend.port }}
+              httpHeaders:
+              - name: "Cookie"
+                value: "shop_session-id=x-liveness-probe"
+          env:
+          - name: PORT
+            value: "{{ .Values.frontend.port }}"
+          - name: PRODUCT_CATALOG_SERVICE_ADDR
+            value: "productcatalogservice:{{ .Values.productcatalogservice.port }}"
+          - name: CURRENCY_SERVICE_ADDR
+            value: "currencyservice:{{ .Values.currencyservice.port }}"
+          - name: CART_SERVICE_ADDR
+            value: "cartservice:{{ .Values.cartservice.port }}"
+          - name: RECOMMENDATION_SERVICE_ADDR
+            value: "recommendationservice:{{ .Values.recommendationservice.port }}"
+          - name: SHIPPING_SERVICE_ADDR
+            value: "shippingservice:{{ .Values.shippingservice.port }}"
+          - name: CHECKOUT_SERVICE_ADDR
+            value: "checkoutservice:{{ .Values.checkoutservice.port }}"
+          - name: AD_SERVICE_ADDR
+            value: "adservice:{{ .Values.adservice.port }}"
+          - name: SHOPPING_ASSISTANT_SERVICE_ADDR
+            value: "shoppingassistantservice:80"
+          - name: ENABLE_PROFILER
+            value: "0"
+          resources:
+            requests:
+              cpu: {{ .Values.frontend.resources.requests.cpu }}
+              memory: {{ .Values.frontend.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.frontend.resources.limits.cpu }}
+              memory: {{ .Values.frontend.resources.limits.memory }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  labels:
+    app: frontend
+spec:
+  type: ClusterIP
+  selector:
+    app: frontend
+  ports:
+  - name: http
+    port: 80
+    targetPort: {{ .Values.frontend.port }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-external
+  labels:
+    app: frontend
+spec:
+  type: LoadBalancer
+  selector:
+    app: frontend
+  ports:
+  - name: http
+    port: 80
+    targetPort: {{ .Values.frontend.port }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: frontend

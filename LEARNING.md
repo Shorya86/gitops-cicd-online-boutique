@@ -100,3 +100,24 @@ Notes after each week's milestone — what I built, what confused me, what I'd e
 - Multi-stage Docker builds need *every* stage's base image pinned consistently, not just the builder — pinning one stage and leaving another to float is a reproducibility bug waiting to happen
 - CI's value isn't just "did it build" — the smoke test step (actually running the container, not just building it) is what caught two of the three bugs; a pipeline that only builds and pushes would have shipped a broken image straight to a registry
 
+---
+
+## Week 5 — Helm charts
+
+**Draft — rewrite this in your own words before treating it as done.**
+
+### What I built
+- A Helm chart covering all 12 deployable objects (11 microservices + redis-cart), parameterizing replica counts, image repository/tag, and resource requests/limits through `values.yaml`
+- `values.yaml` as the local-appropriate defaults (used automatically, no flag needed) plus a smaller `values-azure.yaml` override layer with just the deltas that differ for Azure — merged via `helm template -f values.yaml -f values-azure.yaml`, rather than duplicating the whole file for each environment
+- Actually installed the chart into a real, separate namespace (`helm-test`) on the `kind` cluster to prove it deploys and boots correctly, not just that it lints/renders
+
+### What confused me
+- `helm lint` and `helm template` only check that a chart's *syntax* is valid and produces plausible YAML — neither one proves the resulting pods actually come up healthy. `helm install` reporting `STATUS: deployed` only means the API server accepted the manifests, not that anything inside them actually works. The real proof was `kubectl get pods` showing `1/1 Running`.
+- I (Claude, doing the fast-tracked templating) dropped a required environment variable (`SHOPPING_ASSISTANT_SERVICE_ADDR`) from the `frontend` template, assuming it was only needed for an optional feature we don't use. It wasn't optional — the Go code reads it unconditionally at startup and panics if it's missing, regardless of whether the feature is actually invoked. This only surfaced because we deployed to a real namespace and checked pod status, not from lint/template/review alone.
+- Using a separate Kubernetes **namespace** (`helm-test`) let us install the chart for real without touching or colliding with the already-running Week 1 deployment in `default` — two objects can share the exact same name as long as they're in different namespaces.
+
+### How I'd explain it in an interview
+- Helm's real value is separating a resource's *shape* (the template) from its *values* — one template, multiple values files, instead of maintaining full duplicate copies of manifests per environment
+- A chart passing `helm lint`/`helm template` is a necessary but not sufficient check — the only real proof a chart works is deploying it and watching pods actually reach `Running`, same discipline as verifying any other change in this project
+- Environment variables that look "just for an optional feature" can still be required at the code level even when the feature itself is unused — assuming otherwise without checking the actual startup code is exactly how this bug got introduced
+

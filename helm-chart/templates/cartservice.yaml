@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cartservice
+  labels:
+    app: cartservice
+spec:
+  replicas: {{ .Values.cartservice.replicaCount }}
+  selector:
+    matchLabels:
+      app: cartservice
+  template:
+    metadata:
+      labels:
+        app: cartservice
+    spec:
+      serviceAccountName: cartservice
+      terminationGracePeriodSeconds: 5
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+      - name: server
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          privileged: false
+          readOnlyRootFilesystem: true
+        image: "{{ .Values.cartservice.image.repository }}:{{ .Values.cartservice.image.tag }}"
+        ports:
+        - containerPort: {{ .Values.cartservice.port }}
+        env:
+        - name: REDIS_ADDR
+          value: "redis-cart:{{ .Values.redisCart.port }}"
+        resources:
+          requests:
+            cpu: {{ .Values.cartservice.resources.requests.cpu }}
+            memory: {{ .Values.cartservice.resources.requests.memory }}
+          limits:
+            cpu: {{ .Values.cartservice.resources.limits.cpu }}
+            memory: {{ .Values.cartservice.resources.limits.memory }}
+        readinessProbe:
+          initialDelaySeconds: 15
+          grpc:
+            port: {{ .Values.cartservice.port }}
+        livenessProbe:
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          grpc:
+            port: {{ .Values.cartservice.port }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cartservice
+  labels:
+    app: cartservice
+spec:
+  type: ClusterIP
+  selector:
+    app: cartservice
+  ports:
+  - name: grpc
+    port: {{ .Values.cartservice.port }}
+    targetPort: {{ .Values.cartservice.port }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cartservice
