@@ -40,10 +40,12 @@ spec:
           value: "1"
         readinessProbe:
           periodSeconds: 5
+          timeoutSeconds: 5
           grpc:
             port: {{ .Values.emailservice.port }}
         livenessProbe:
           periodSeconds: 5
+          timeoutSeconds: 5
           grpc:
             port: {{ .Values.emailservice.port }}
         resources:

@@ -35,10 +35,12 @@ spec:
         - containerPort: {{ .Values.recommendationservice.port }}
         readinessProbe:
           periodSeconds: 5
+          timeoutSeconds: 5
           grpc:
             port: {{ .Values.recommendationservice.port }}
         livenessProbe:
           periodSeconds: 5
+          timeoutSeconds: 5
           grpc:
             port: {{ .Values.recommendationservice.port }}
         env:
