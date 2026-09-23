@@ -121,3 +121,27 @@ Notes after each week's milestone — what I built, what confused me, what I'd e
 - A chart passing `helm lint`/`helm template` is a necessary but not sufficient check — the only real proof a chart works is deploying it and watching pods actually reach `Running`, same discipline as verifying any other change in this project
 - Environment variables that look "just for an optional feature" can still be required at the code level even when the feature itself is unused — assuming otherwise without checking the actual startup code is exactly how this bug got introduced
 
+---
+
+## Week 6 — ArgoCD + GitOps
+
+**Draft — rewrite this in your own words before treating it as done.**
+
+### What I built
+- Installed ArgoCD into the `kind` cluster and got into its dashboard
+- Wrote an `Application` manifest pointing ArgoCD at this repo's `helm-chart/` folder, with `selfHeal: true` and `prune: true` in the sync policy
+- Made the repo public so ArgoCD could actually clone it (it was private, which is not obvious from the error message ArgoCD gives)
+- Proved the GitOps loop works for real: fixed a real bug (probe timeouts under load) purely by editing the Helm chart, committing, and pushing — no manual `kubectl`/`helm` commands touched the cluster at all
+- Wired up ArgoCD → Slack notifications for sync success/failure, reusing the same Slack webhook from Week 4's CI pipeline
+
+### What confused me
+- `kubectl apply`ing ArgoCD's own install manifest failed on a CRD ("`metadata.annotations: Too long`") — one of ArgoCD's CRDs has such a large embedded schema that `kubectl apply`'s tracking annotation exceeds Kubernetes' 256KB per-resource annotation limit. The fix is `--server-side` apply, which tracks ownership differently and doesn't hit this limit — a real, well-known gotcha specific to installing tools with very large CRDs (not something we'd hit with our own app).
+- Deploying all 12 services *plus* ArgoCD's own 7 control-plane pods simultaneously (19 pods total) on one laptop node caused real CPU contention — enough that two services' gRPC health checks occasionally couldn't respond within Kubernetes' default 1-second probe timeout, causing `CrashLoopBackOff` even though the services themselves were healthy and listening. This never happened with fewer pods running (our standalone Helm test in Week 5). The fix was bumping `timeoutSeconds` on just those two probes — a legitimate tuning decision for resource-constrained local dev, not something to blindly apply everywhere.
+- ArgoCD's built-in health check for a `LoadBalancer` Service waits for a real external IP before calling it "Healthy" — which `kind` never provides (no cloud load balancer controller exists locally, same fact we learned in Week 1). This meant the app was permanently stuck showing "Progressing" even though every actual resource was fully healthy. Fixed with a custom health check override in `argocd-cm` — a real, if slightly advanced, ArgoCD feature for exactly this kind of environment mismatch.
+- Got the Slack notification subscription wrong on the first try: I subscribed to `webhook` (the service *type*) instead of `slack` (the specific *name* I gave that webhook service, `service.webhook.slack`). The notifications controller's own logs (`notification service 'webhook' is not supported`) made the fix obvious once I actually read them instead of guessing.
+
+### How I'd explain it in an interview
+- GitOps isn't just "ArgoCD deploys things automatically" — the actual proof it's working is that you can fix a real bug *without ever running `kubectl` against the live cluster*, purely through Git. That's what makes drift detection and `selfHeal` meaningful, not just a checkbox.
+- Health checks in Kubernetes and in ArgoCD are two separate layers: Kubernetes' own liveness/readiness probes decide if a *pod* is healthy; ArgoCD's health assessment decides if a *resource matches expectations* (which for some resource types, like `LoadBalancer` Services, means checking things that simply don't apply to a local dev cluster)
+- When something fails silently or with a vague error, the controller's own logs are almost always more specific than the surface-level status — `kubectl logs` on ArgoCD's notifications controller told me exactly what was wrong in one line, instead of me guessing at the annotation syntax
+
