@@ -3,6 +3,9 @@ kind: Application
 metadata:
   name: online-boutique
   namespace: argocd
+  annotations:
+    notifications.argoproj.io/subscribe.on-sync-succeeded.webhook: ""
+    notifications.argoproj.io/subscribe.on-sync-failed.webhook: ""
 spec:
   project: default
   source:
