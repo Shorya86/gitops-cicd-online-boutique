@@ -4,8 +4,8 @@ metadata:
   name: online-boutique
   namespace: argocd
   annotations:
-    notifications.argoproj.io/subscribe.on-sync-succeeded.webhook: ""
-    notifications.argoproj.io/subscribe.on-sync-failed.webhook: ""
+    notifications.argoproj.io/subscribe.on-sync-succeeded.slack: ""
+    notifications.argoproj.io/subscribe.on-sync-failed.slack: ""
 spec:
   project: default
   source:
